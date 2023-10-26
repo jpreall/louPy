@@ -6,6 +6,8 @@ import h5py
 import os
 import re
 import subprocess
+from datetime import datetime
+
 
 """
 Useful hack to write a Loupe file from a Scanpy object using LoupeR (10X)
@@ -18,13 +20,36 @@ Step 2: Run "setup" to download LoupeR executable and agree to EULA
 
 Step 3: Copy LoupeR executable file to the same directory as this .py file
 
+Usage: 
+   
+    make_loupe(
+        adata, 
+        cloupe_path, 
+        force=False #Overwrite .cloupe file of the same name, if it exists 
+        )
+
 """
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 louper_path = os.path.join(script_dir, "louper")
 
+def make_loupe(adata, cloupe_path, force=False, LouPy_style=True, h5path=None):
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 
-def create_hdf5(adata, h5path, scanpy_obj_version, LouPy_style=False):
+    if h5path == None:
+        h5file = f'tmp_{timestamp}.h5'
+        h5path = os.path.join(os.getcwd(), h5file)
+
+    create_hdf5(adata, h5path, LouPy_style)
+    if cloupe_path == None:
+        cloupe_file = f'Converted_{timestamp}.cloupe'
+        cloupe_path = os.path.join(os.getcwd(), cloupe_file)
+
+    run_louper(h5path, cloupe_path, force=force)
+
+    os.remove(h5path)
+
+def create_hdf5(adata, h5path, LouPy_style=True):
     if os.path.exists(h5path):
         raise ValueError(f"Cannot create h5 file {h5path}, file already exists.")
 
@@ -32,11 +57,18 @@ def create_hdf5(adata, h5path, scanpy_obj_version, LouPy_style=False):
         write_mat(f, adata)
         write_clusters(f, adata)
         write_projections(f, adata)
-        metadata = create_metadata(scanpy_obj_version, LouPy_style=LouPy_style)
+        metadata = create_metadata(LouPy_style=LouPy_style)
         # Assuming you have a function to write metadata to the HDF5 file
         write_metadata(f, metadata)
 
     return "SUCCESS"
+
+def run_louper(h5_path, cloupe_path, force=False):
+    cmd = [louper_path, "create", "--input={}".format(h5_path), "--output={}".format(cloupe_path)]
+    if force:
+        cmd.append("--force")
+    subprocess.run(cmd)
+
 
 def write_mat(f, adata, layer='counts'):
     """
@@ -147,7 +179,7 @@ def write_projections(f, adata):
             create_str_dataset(group, "method", strs=name)
             group.create_dataset("data", data=projection.T, compression='gzip')
             
-def create_metadata(scanpy_obj_version=None, LouPy_style=False):
+def create_metadata(LouPy_style=True):
     
     if LouPy_style:
         # Get Python version
@@ -166,7 +198,8 @@ def create_metadata(scanpy_obj_version=None, LouPy_style=False):
         # Create extra dictionary
         extra = {}
         extra["loupePy_scanpy_version"] = pkg_resources.get_distribution("scanpy").version if pkg_resources.get_distribution("scanpy") else "n/a"
-        extra["loupePy_scanpy_object_version"] = scanpy_obj_version if scanpy_obj_version else "n/a"
+        #extra["loupePy_scanpy_object_version"] = scanpy_obj_version if scanpy_obj_version else "n/a"
+        extra["loupePy_scanpy_object_version"] = "n/a"
         extra["loupePy_hdf5_version"] = h5py.version.hdf5_version
         
         # Add extra to meta
@@ -200,14 +233,13 @@ def create_datasets(parent_group, data, groupname):
             create_datasets(group, val, name)
         else:
             if isinstance(val, str):
-                #dtype = h5py.string_dtype(encoding='utf-8')
                 dtype = f'S{len(val)}'
             else:
                 dtype = None
             group.create_dataset(name, data=val, shape=(1,), dtype=dtype)
 
-def write_metadata(f, scanpy_obj_version=None):
-    metadata = create_metadata(scanpy_obj_version)  # Assume create_metadata function exists
+def write_metadata(f, LouPy_style):
+    metadata = create_metadata(LouPy_style=LouPy_style)
 
     create_datasets(f, metadata, "metadata")
 
@@ -268,10 +300,3 @@ def isIntegers(array_like):
     result = np.all(np.mod(data, 1) == 0)
         
     return result
-
-def run_louper(h5_path, cloupe_path, force=False):
-    cmd = [louper_path, "create", "--input={}".format(h5_path), "--output={}".format(cloupe_path)]
-    if force:
-        cmd.append("--force")
-    subprocess.run(cmd)
-
