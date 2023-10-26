@@ -103,11 +103,13 @@ def write_clusters(f, adata):
         raise ValueError("Too many categorical columns in adata.obs. Limit is 16.")
 
     for name, cluster in categorical_columns.items():
+        
         group = clusters_group.create_group(name)
     
         group.create_dataset("name", data=name, shape=(1,), dtype=f'S{len(name)}')
         
-        group_names = cluster.cat.categories.tolist()
+        # Force data into strings
+        group_names = cluster.cat.categories.astype('str').tolist()
         create_str_dataset(group, "group_names", strs=group_names)
 
         assignments = np.array(cluster.cat.codes, dtype='int32')
