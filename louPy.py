@@ -128,17 +128,23 @@ def write_projections(f, adata):
         is_tsne = bool(re.search("tsne", name, re.IGNORECASE))
         is_tsne_dash = bool(re.search("t-sne", name, re.IGNORECASE))
 
+        """
+        # Deprecated this.  I want to be able to add in any 2D dimensinoality reduction
+        # so I just use the name as the "method" variable
+        # This allows for projections named "umap" and "umap_harmony", for example
+        
         if is_umap:
             method = "UMAP"
         elif is_tsne or is_tsne_dash:
             method = "t-SNE"
         else:
             method = name
-        
+        """
+
         if n_dim == 2:
             group = projections_group.create_group(name)
             create_str_dataset(group, "name", strs=name)
-            create_str_dataset(group, "method", strs=method)
+            create_str_dataset(group, "method", strs=name)
             group.create_dataset("data", data=projection.T, compression='gzip')
             
 def create_metadata(scanpy_obj_version=None, LouPy_style=False):
