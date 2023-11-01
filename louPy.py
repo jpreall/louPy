@@ -10,7 +10,7 @@ from datetime import datetime
 
 
 """
-Useful hack to write a Loupe file from a Scanpy object using LoupeR (10X)
+Useful hack to write a Loupe file from a Scanpy object using LoupeR (10X Genomics)
 This module writes a LoupeR-compatible hdf5 file, then passes it to the LoupeR executable
 
 Step 1: Download and install LoupeR from 10X Genomics
@@ -33,14 +33,24 @@ Usage:
 script_dir = os.path.dirname(os.path.abspath(__file__))
 louper_path = os.path.join(script_dir, "louper")
 
-def make_loupe(adata, cloupe_path, force=False, LouPy_style=True, h5path=None):
+def make_loupe(adata, 
+               cloupe_path,
+               clusters = None, 
+               force=False, 
+               LouPy_style=True, 
+               h5path=None,
+               ):
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 
     if h5path == None:
         h5file = f'tmp_{timestamp}.h5'
         h5path = os.path.join(os.getcwd(), h5file)
 
-    create_hdf5(adata, h5path, LouPy_style)
+    create_hdf5(adata, 
+                h5path, 
+                LouPy_style,
+                clusters=clusters)
+
     if cloupe_path == None:
         cloupe_file = f'Converted_{timestamp}.cloupe'
         cloupe_path = os.path.join(os.getcwd(), cloupe_file)
@@ -49,13 +59,16 @@ def make_loupe(adata, cloupe_path, force=False, LouPy_style=True, h5path=None):
 
     os.remove(h5path)
 
-def create_hdf5(adata, h5path, LouPy_style=True):
+def create_hdf5(adata, 
+                h5path, 
+                LouPy_style=True,
+                clusters=None):
     if os.path.exists(h5path):
         raise ValueError(f"Cannot create h5 file {h5path}, file already exists.")
 
     with h5py.File(h5path, 'w') as f:
         write_mat(f, adata)
-        write_clusters(f, adata)
+        write_clusters(f, adata, clusters=clusters)
         write_projections(f, adata)
         metadata = create_metadata(LouPy_style=LouPy_style)
         # Assuming you have a function to write metadata to the HDF5 file
@@ -125,16 +138,39 @@ def write_mat(f, adata, layer='counts'):
     matrix_group.create_dataset("indptr", data=count_mat.indptr.astype('int32'), compression='gzip')
     matrix_group.create_dataset("shape", data=np.array([feature_count, barcode_count]).astype('int32'), compression='gzip')
 
-def write_clusters(f, adata):
+def write_clusters(f, 
+                   adata,
+                   clusters = None,
+                   force=False):
     """
-    Searches for categorical observations in adata.obs and writes them all to h5 file.
-    """
-    clusters_group = f.create_group("clusters")
-    categorical_columns = adata.obs.select_dtypes(include=['category'])
-    if len(categorical_columns.columns) > 16:
-        raise ValueError("Too many categorical columns in adata.obs. Limit is 16.")
+    Writes categorical observations in adata.obs to the h5 file.
+    LoupeR calls these 'clusters', but they could be any useful categorical variable.
+    eg. Sample, Batch, cell cycle phase, or anything else you have tracked.
 
-    for name, cluster in categorical_columns.items():
+    To avoid generating an overly cluttered Loupe file, defaults to limiting the number
+    of 'cluster' groupings to 16.
+
+    Parameters:
+    clusters (Optional): list of column names in adata.var to include as 'cluster' groups
+    force: If you really want more than 16 cluster groups, set force=True.
+    """
+    if isinstance(clusters, str):
+        clusters = [clusters]
+
+    categorical_data = adata.obs.select_dtypes(include=['category'])
+
+    if clusters:
+        categorical_data = categorical_data.loc[:,clusters]
+        if len(clusters) > 16:
+            force = True
+
+    if not force:
+        if len(categorical_data.columns) > 16:
+            raise ValueError("Too many categorical columns in adata.obs. Limit is 16.")
+
+    # Start writing to the HDF5 file
+    clusters_group = f.create_group("clusters")
+    for name, cluster in categorical_data.items():
         
         group = clusters_group.create_group(name)
     
