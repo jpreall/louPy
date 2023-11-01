@@ -20,8 +20,22 @@ Place the LoupeR executable in the same directory as this script.
 make_loupe(
     adata, 
     cloupe_path, 
-    force=False # Overwrite .cloupe file of the same name, if it exists 
-)
+    )
+```
+
+#### Optional parameters:  
+`force (Bool)`: If True, overwrite .cloupe file of the same name, if it exists. Default = `False`  
+`clusters (list)`: list of categorical columns in `adata.obs` to include as 'cluster' groups in Loupe file.  Defaults to use all availble catagorical columns in `adata`, if fewer than 16.
+
+
+For example:
+```
+make_loupe(
+    adata, 
+    cloupe_path = '/path/to/write/myloupe.cloupe',
+    clusters = ['Clusters_res0.3', 'Clusters_res0.5','Batch','Donor'], 
+    force = True
+    )
 ```
 
 ### Functions
