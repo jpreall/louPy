@@ -25,7 +25,7 @@ make_loupe(
 
 #### Optional parameters:  
 `force (Bool)`: If True, overwrite .cloupe file of the same name, if it exists. Default = `False`  
-`clusters (list)`: list of categorical columns in `adata.obs` to include as 'cluster' groups in Loupe file.  Defaults to use all availble catagorical columns in `adata`, if fewer than 16.
+`clusters (list)`: list of categorical columns in `adata.obs` to include as 'cluster' groups in Loupe file.  Defaults to use all available catagorical columns in `adata`, if fewer than 16.
 
 
 For example:
