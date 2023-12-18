@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 from datetime import datetime
+from scipy.sparse import issparse
 
 
 """
@@ -40,9 +41,22 @@ def make_loupe(adata,
                LouPy_style=True, 
                h5path=None,
                ):
+    """
+    Purpose: This function orchestrates the process of creating a Loupe file from a Scanpy object. 
+    It involves generating an HDF5 file, running the LoupeR tool, and handling the file paths.
+
+    Parameters:
+        adata: The Scanpy object containing the data to be converted.
+        cloupe_path: The path where the output Loupe file should be saved.
+        clusters (optional): Specifies which clusters to include from adata.
+        force (optional): If True, overwrites any existing Loupe file with the same name.
+        LouPy_style (optional): Determines the style of metadata creation.
+        h5path (optional): The path for the intermediate HDF5 file.
+    """
+
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 
-    if h5path == None:
+    if h5path is None:
         h5file = f'tmp_{timestamp}.h5'
         h5path = os.path.join(os.getcwd(), h5file)
 
@@ -51,7 +65,7 @@ def make_loupe(adata,
                 LouPy_style,
                 clusters=clusters)
 
-    if cloupe_path == None:
+    if cloupe_path is None:
         cloupe_file = f'Converted_{timestamp}.cloupe'
         cloupe_path = os.path.join(os.getcwd(), cloupe_file)
 
@@ -63,9 +77,19 @@ def create_hdf5(adata,
                 h5path, 
                 LouPy_style=True,
                 clusters=None):
+    """
+    Purpose: Generates an HDF5 file to be read by LoupeR binary.
+
+    Parameters:
+        adata: The Scanpy object to be converted.
+        h5path: Path where the HDF5 file should be saved.
+        LouPy_style (optional): Style flag for metadata creation.
+        clusters (optional): Specific clusters to include in the HDF5 file.
+        
+    """
     if os.path.exists(h5path):
         raise ValueError(f"Cannot create h5 file {h5path}, file already exists.")
-
+    
     with h5py.File(h5path, 'w') as f:
         write_mat(f, adata)
         write_clusters(f, adata, clusters=clusters)
@@ -77,6 +101,15 @@ def create_hdf5(adata,
     return "SUCCESS"
 
 def run_louper(h5_path, cloupe_path, force=False):
+    """
+    Purpose: Runs the LoupeR tool to convert an HDF5 file into a Loupe file.
+
+    Parameters:
+        h5_path: Path to the input HDF5 file.
+        cloupe_path: Path where the output Loupe file should be saved.
+        force (optional): If True, overwrites an existing Loupe file.
+    """
+
     cmd = [louper_path, "create", "--input={}".format(h5_path), "--output={}".format(cloupe_path)]
     if force:
         cmd.append("--force")
@@ -97,7 +130,7 @@ def write_mat(f, adata, layer='counts'):
 
     def sanitize_barcodes(barcodes_unmodified):
         """
-        TODO: actually write a full-features barcode sanitization function
+        TODO: actually write a full-featured barcode sanitization function
         """
         barcode_sequence = barcodes_unmodified.str.split('-').str[0]
         barcode_suffix = barcodes_unmodified.str.split('-').str[1].str.zfill(4)
@@ -187,6 +220,15 @@ def write_clusters(f,
         create_str_dataset(group, "clustering_type", strs="unknown")
 
 def write_projections(f, adata):
+    """
+    Purpose: 
+    Writes projection data (like UMAP or t-SNE) from a Scanpy object to an HDF5 file.
+    Finds any 2D projection in adata.obsm and writes it to the HDF5
+    
+    Parameters:
+        f: The HDF5 file object.
+        adata: The Scanpy object.
+    """
     projections_group = f.create_group("projections")
 
     for name, projection in adata.obsm.items():
@@ -216,6 +258,19 @@ def write_projections(f, adata):
             group.create_dataset("data", data=projection.T, compression='gzip')
             
 def create_metadata(LouPy_style=True):
+    """
+    Purpose: 
+        Creates metadata for the HDF5 file.
+        Unclear which of these keys are being used by LoupeR
+        LouPy_style=False will mimic the R portion of LoupeR's funationality,
+        effectively pretending to be coming from a Seurat object
+
+        This doesn't seem to be necessary, and will likely be removed in a future version.
+    
+    Parameters:
+        LouPy_style (optional): True --> Populates metadata dictionary with version data relevant to LoupPy.
+        Returns: A dictionary containing metadata.
+    """
     
     if LouPy_style:
         # Get Python version
@@ -262,6 +317,18 @@ def create_metadata(LouPy_style=True):
     return meta
 
 def create_datasets(parent_group, data, groupname):
+    """
+    Purpose: 
+        Recursively creates datasets within an HDF5 file from a nested dictionary.
+    
+    Parameters:
+        parent_group: The parent group in the HDF5 file.
+        data: The dictionary containing data to be written.
+        groupname: The name of the group to be created.
+    
+    Returns: 
+        None. The function writes data directly to the HDF5 file.
+    """
     group = parent_group.create_group(groupname)
 
     for name, val in data.items():
@@ -275,6 +342,14 @@ def create_datasets(parent_group, data, groupname):
             group.create_dataset(name, data=val, shape=(1,), dtype=dtype)
 
 def write_metadata(f, LouPy_style):
+    """
+    Purpose: 
+        Writes metadata to an HDF5 file.
+
+    Parameters:
+        f: The HDF5 file object.
+        LouPy_style (optional): Style flag for metadata
+    """
     metadata = create_metadata(LouPy_style=LouPy_style)
 
     create_datasets(f, metadata, "metadata")
@@ -322,10 +397,15 @@ def create_str_dataset(obj, key, strs, dtype=None):
         )
 def isIntegers(array_like):
     """
-    Helper function. Checks if an array contains only integers
+    Purpose: 
+    Checks if a given array contains only integer values.
+    
+    Parameters:
+        array_like: The array to be checked.
+    
+    Returns: 
+        True if all elements are integers, otherwise False.
     """
-
-    from scipy.sparse import issparse
 
     elements_to_check = 100000
     if issparse(array_like):
