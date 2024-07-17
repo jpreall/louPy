@@ -1,10 +1,9 @@
-import h5py
-import numpy as np
-import platform
-import pkg_resources
-import h5py
 import os
 import re
+import numpy as np
+import h5py
+import platform
+import pkg_resources
 import subprocess
 from datetime import datetime
 from scipy.sparse import issparse
@@ -181,12 +180,13 @@ def write_clusters(f,
     eg. Sample, Batch, cell cycle phase, or anything else you have tracked.
 
     To avoid generating an overly cluttered Loupe file, defaults to limiting the number
-    of 'cluster' groupings to 16.
+    of 'cluster' groupings to 32.
 
     Parameters:
     clusters (Optional): list of column names in adata.var to include as 'cluster' groups
-    force: If you really want more than 16 cluster groups, set force=True.
+    force: If you really want more than 32 cluster groups, set force=True.
     """
+    max_clusterings = 32
     if isinstance(clusters, str):
         clusters = [clusters]
 
@@ -194,12 +194,12 @@ def write_clusters(f,
 
     if clusters:
         categorical_data = categorical_data.loc[:,clusters]
-        if len(clusters) > 16:
+        if len(clusters) > max_clusterings:
             force = True
 
     if not force:
-        if len(categorical_data.columns) > 16:
-            raise ValueError("Too many categorical columns in adata.obs. Limit is 16.")
+        if len(categorical_data.columns) > max_clusterings:
+            raise ValueError(f"Too many categorical columns in adata.obs. Limit is {max_clusterings}.")
 
     # Start writing to the HDF5 file
     clusters_group = f.create_group("clusters")
@@ -257,62 +257,32 @@ def write_projections(f, adata):
             create_str_dataset(group, "method", strs=name)
             group.create_dataset("data", data=projection.T, compression='gzip')
             
-def create_metadata(LouPy_style=True):
+def create_metadata():
     """
     Purpose: 
         Creates metadata for the HDF5 file.
-        Unclear which of these keys are being used by LoupeR
-        LouPy_style=False will mimic the R portion of LoupeR's funationality,
-        effectively pretending to be coming from a Seurat object
-
-        This doesn't seem to be necessary, and will likely be removed in a future version.
-    
-    Parameters:
-        LouPy_style (optional): True --> Populates metadata dictionary with version data relevant to LoupPy.
         Returns: A dictionary containing metadata.
     """
     
-    if LouPy_style:
-        # Get Python version
-        python_version = platform.python_version()
-        
-        # Create metadata dictionary
-        meta = {}
-        meta["tool"] = "loupePy"
-        #meta["tool_version"] = pkg_resources.get_distribution("loupePy").version if pkg_resources.get_distribution("loupePy") else "n/a"
-        meta["tool_version"] = "pre-alpha"
-        meta["os"] = platform.system()
-        meta["system"] = platform.platform()
-        meta["language"] = "Python"
-        meta["language_version"] = python_version
-        
-        # Create extra dictionary
-        extra = {}
-        extra["loupePy_scanpy_version"] = pkg_resources.get_distribution("scanpy").version if pkg_resources.get_distribution("scanpy") else "n/a"
-        #extra["loupePy_scanpy_object_version"] = scanpy_obj_version if scanpy_obj_version else "n/a"
-        extra["loupePy_scanpy_object_version"] = "n/a"
-        extra["loupePy_hdf5_version"] = h5py.version.hdf5_version
-        
-        # Add extra to meta
-        meta["extra"] = extra
+    # Create metadata dictionary
+    meta = {}
+    meta["tool"] = "loupePy"
+    #meta["tool_version"] = pkg_resources.get_distribution("loupePy").version if pkg_resources.get_distribution("loupePy") else "n/a"
+    meta["tool_version"] = "pre-alpha"
+    meta["os"] = platform.system()
+    meta["system"] = platform.platform()
+    meta["language"] = "Python"
+    meta["language_version"] = platform.python_version()
     
-    else:
-        # Hardcoded metadata from R version
-        meta = {}
-        meta["tool"] = "loupeR"
-        meta["tool_version"] = "1.0.0"
-        meta["os"] = "macOS Catalina 10.15.7"
-        meta["system"] = 'x86_64-apple-darwin17.0 (64-bit)'
-        meta["language"] = "R"
-        meta["language_version"] = "4.2.3"
-
-        extra = {}
-        extra["loupeR_hdf5_version"] = "1.12.1"
-        extra["loupeR_hdf5r_version"] = "1.3.8"
-        extra["loupeR_seurat_object_version"] = "5.0.0"
-        extra["loupeR_seurat_version"] = "5.0.0"
-
-        meta["extra"] = extra
+    # Create extra dictionary
+    extra = {}
+    extra["loupePy_scanpy_version"] = pkg_resources.get_distribution("scanpy").version if pkg_resources.get_distribution("scanpy") else "n/a"
+    #extra["loupePy_scanpy_object_version"] = scanpy_obj_version if scanpy_obj_version else "n/a"
+    extra["loupePy_scanpy_object_version"] = "n/a"
+    extra["loupePy_hdf5_version"] = h5py.version.hdf5_version
+    
+    # Add extra to meta
+    meta["extra"] = extra
 
     return meta
 
