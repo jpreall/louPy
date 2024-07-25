@@ -10,19 +10,20 @@ import platform
 import pkg_resources
 import subprocess
 from datetime import datetime
-from scipy.sparse import issparse
+
+from loupy.validation import is_integers
+from loupy.barcodes import format_barcodes, swap_barcodes
+from loupy.executable import find_executable, setup_executable, tenx_eula
 
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-louper_path = os.path.join(script_dir, "louper")
-
-def make_loupe(adata, 
-               cloupe_path,
-               clusters = None, 
-               force=False, 
-               LouPy_style=True, 
-               h5path=None,
-               ):
+def make_loupe(
+    adata, 
+    cloupe_path,
+    clusters = None, 
+    force=False, 
+    LouPy_style=True, 
+    h5path=None,
+):
     """
     Purpose: This function orchestrates the process of creating a Loupe file from a Scanpy object. 
     It involves generating an HDF5 file, running the LoupeR tool, and handling the file paths.
@@ -42,10 +43,12 @@ def make_loupe(adata,
         h5file = f'tmp_{timestamp}.h5'
         h5path = os.path.join(os.getcwd(), h5file)
 
-    create_hdf5(adata, 
-                h5path, 
-                LouPy_style,
-                clusters=clusters)
+    create_hdf5(
+        adata, 
+        h5path, 
+        LouPy_style,
+        clusters=clusters
+    )
 
     if cloupe_path is None:
         cloupe_file = f'Converted_{timestamp}.cloupe'
@@ -55,10 +58,12 @@ def make_loupe(adata,
 
     os.remove(h5path)
 
-def create_hdf5(adata, 
-                h5path, 
-                LouPy_style=True,
-                clusters=None):
+def create_hdf5(
+    adata, 
+    h5path, 
+    LouPy_style=True,
+    clusters=None
+):
     """
     Purpose: Generates an HDF5 file to be read by LoupeR binary.
 
@@ -82,6 +87,7 @@ def create_hdf5(adata,
 
     return "SUCCESS"
 
+
 def run_louper(h5_path, cloupe_path, force=False):
     """
     Purpose: Runs the LoupeR tool to convert an HDF5 file into a Loupe file.
@@ -91,11 +97,23 @@ def run_louper(h5_path, cloupe_path, force=False):
         cloupe_path: Path where the output Loupe file should be saved.
         force (optional): If True, overwrites an existing Loupe file.
     """
+    louper_path = find_executable()
+    if not louper_path:
+        raise FileNotFoundError(
+            "Could not find a valid louper executable. Run `setup_executable()`."
+        )
+    if not louper_path.exists():
+        raise FileNotFoundError(f"Executable {louper_path} does not exist.")
 
-    cmd = [louper_path, "create", "--input={}".format(h5_path), "--output={}".format(cloupe_path)]
+    cmd = [str(louper_path), "create", "--input={}".format(h5_path), "--output={}".format(cloupe_path)]
     if force:
         cmd.append("--force")
-    subprocess.run(cmd)
+    res = subprocess.run(cmd, capture_output=True)
+
+    if res.returncode > 0:
+        print(res.stdout.decode("ascii"))
+        print(res.stderr.decode("ascii"))
+        raise Exception(f"Louper executable failed: status code {res.returncode}")
 
 
 def write_mat(f, adata, layer='counts'):
@@ -125,7 +143,7 @@ def write_mat(f, adata, layer='counts'):
         raise ValueError(f"{layer} layer not found in adata.layers")
     count_mat = adata.layers[layer]
 
-    if not isIntegers(count_mat):
+    if not is_integers(count_mat):
         raise ValueError(f"The provided layer ({layer}) must contain only integer values")
     
     barcodes_unmodified = adata.obs_names.tolist()
@@ -269,6 +287,7 @@ def create_metadata():
 
     return meta
 
+
 def create_datasets(parent_group, data, groupname):
     """
     Purpose: 
@@ -294,6 +313,7 @@ def create_datasets(parent_group, data, groupname):
                 dtype = None
             group.create_dataset(name, data=val, shape=(1,), dtype=dtype)
 
+
 def write_metadata(f, LouPy_style):
     """
     Purpose: 
@@ -317,6 +337,7 @@ def create_dataset(obj, key, value, dtype=None):
                        #dtype=dtype
                     )
     obj.close()
+
 
 def create_str_dataset(obj, key, strs, dtype=None):
     isScalar = isinstance(strs, str)
@@ -347,25 +368,4 @@ def create_str_dataset(obj, key, strs, dtype=None):
         dtype=dtype,
         shape=shape,
         compression=compression
-        )
-def isIntegers(array_like):
-    """
-    Purpose: 
-    Checks if a given array contains only integer values.
-    
-    Parameters:
-        array_like: The array to be checked.
-    
-    Returns: 
-        True if all elements are integers, otherwise False.
-    """
-
-    elements_to_check = 100000
-    if issparse(array_like):
-        data = array_like.data[:elements_to_check]
-    else:
-        rows_to_check = np.ceil(elements_to_check/array_like.shape[1]).astype('int')
-        data = array_like[:rows_to_check,:]
-    result = np.all(np.mod(data, 1) == 0)
-        
-    return result
+    )
