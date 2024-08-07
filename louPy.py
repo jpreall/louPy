@@ -37,7 +37,6 @@ def make_loupe(adata,
                cloupe_path,
                clusters = None, 
                force=False, 
-               LouPy_style=True, 
                h5path=None,
                ):
     """
@@ -49,7 +48,6 @@ def make_loupe(adata,
         cloupe_path: The path where the output Loupe file should be saved.
         clusters (optional): Specifies which clusters to include from adata.
         force (optional): If True, overwrites any existing Loupe file with the same name.
-        LouPy_style (optional): Determines the style of metadata creation.
         h5path (optional): The path for the intermediate HDF5 file.
     """
 
@@ -61,7 +59,6 @@ def make_loupe(adata,
 
     create_hdf5(adata, 
                 h5path, 
-                LouPy_style,
                 clusters=clusters)
 
     if cloupe_path is None:
@@ -74,7 +71,6 @@ def make_loupe(adata,
 
 def create_hdf5(adata, 
                 h5path, 
-                LouPy_style=True,
                 clusters=None):
     """
     Purpose: Generates an HDF5 file to be read by LoupeR binary.
@@ -82,7 +78,6 @@ def create_hdf5(adata,
     Parameters:
         adata: The Scanpy object to be converted.
         h5path: Path where the HDF5 file should be saved.
-        LouPy_style (optional): Style flag for metadata creation.
         clusters (optional): Specific clusters to include in the HDF5 file.
         
     """
@@ -93,9 +88,9 @@ def create_hdf5(adata,
         write_mat(f, adata)
         write_clusters(f, adata, clusters=clusters)
         write_projections(f, adata)
-        metadata = create_metadata(LouPy_style=LouPy_style)
+        metadata = create_metadata()
         # Assuming you have a function to write metadata to the HDF5 file
-        write_metadata(f, metadata)
+        write_metadata(f)
 
     return "SUCCESS"
 
@@ -311,16 +306,15 @@ def create_datasets(parent_group, data, groupname):
                 dtype = None
             group.create_dataset(name, data=val, shape=(1,), dtype=dtype)
 
-def write_metadata(f, LouPy_style):
+def write_metadata(f):
     """
     Purpose: 
         Writes metadata to an HDF5 file.
 
     Parameters:
         f: The HDF5 file object.
-        LouPy_style (optional): Style flag for metadata
     """
-    metadata = create_metadata(LouPy_style=LouPy_style)
+    metadata = create_metadata()
 
     create_datasets(f, metadata, "metadata")
 
