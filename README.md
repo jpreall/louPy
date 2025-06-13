@@ -17,8 +17,16 @@ platformdirs>=2.5.0
 Clone this repository. When first running `make_loupe`, setup will prompt you to agree to the 10X Genomics EULA and download the necessary Rust executable to create the Loupe file.
 
 ### Usage
+To be able to call louPy, you need to add the folder containing louPy.py to your path variable:
 ```
-from louPY impmort make_loupe
+import sys
+sys.path.append('/Users/YourUsername/path/to/louPy/')
+```
+  
+Analyze your scRNA-seq data your usual way using Scanpy. Once you AnnData object is in a state you would like to export and share as a Loupe file, run:
+  
+```
+from louPy import make_loupe
 
 make_loupe(
     adata, 
