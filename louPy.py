@@ -179,7 +179,7 @@ def make_loupe(adata,
         raise FileExistsError(f"Loupe file {cloupe_path} already exists. Use overwrite=True to replace it.")
     
     #print log:
-    log_string = f"Writing Loupe file with shape: {adata.shape[0]} cells X {adata.shape[1]} features"
+    log_string = f"Writing Loupe file with shape: {adata.shape[0]:,} cells X {adata.shape[1]:,} features"
     print()
     if 'n_clusters' in _log:
         log_string += f" and {_log['n_clusters']} annotations"
