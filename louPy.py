@@ -56,9 +56,16 @@ def executable_basename():
     return "louper.exe" if platform.system().lower().startswith("win") else "louper"
 
 def default_executable_path():
-    d = user_data_dir("loupePy", "10XGenomics")
-    Path(d).mkdir(parents=True, exist_ok=True)
-    return os.path.join(d, executable_basename())
+    try:    # Check if the executable can be written to the current directory
+        d = os.path.dirname(os.path.abspath(__file__))
+        if os.access(d, os.W_OK):
+            return os.path.join(d, executable_basename()) 
+        else:   # Otherwise, use a user-specific data directory
+            d = user_data_dir("louPy", "10XGenomics")
+            Path(d).mkdir(parents=True, exist_ok=True)
+            return os.path.join(d, executable_basename())
+    except Exception as e:
+        raise RuntimeError(f"Error determining the default executable path: {e}")
 
 def bundled_executable_path():
     return os.path.join(os.path.dirname(__file__), "exec", executable_basename())
