@@ -4,14 +4,14 @@ Loupe File Generator for Scanpy
 ### Overview
 This Python script converts a Scanpy AnnData object into a Loupe-compatible HDF5 file and then runs the LoupeR executable to generate a .cloupe file. For best results, store your original integer UMI counts in the layer `adata.layers['counts']`. 
 
-### Prerequisites
-Python 3.x
-h5py>=3.8.0
-scanpy>=1.5.0
-numpy>=1.20.3
-pandas>=1.0.0
-scipy>=1.5.3
-platformdirs>=2.5.0
+### Requirements
+Python 3.x   
+h5py>=3.8.0  
+scanpy>=1.5.0  
+numpy>=1.20.3  
+pandas>=1.0.0  
+scipy>=1.5.3  
+platformdirs>=2.5.0  
 
 ### Installation
 Clone this repository. When first running `make_loupe`, setup will prompt you to agree to the 10X Genomics EULA and download the necessary Rust executable to create the Loupe file.
