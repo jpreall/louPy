@@ -27,7 +27,7 @@ make_loupe(
 ```
 
 #### Optional parameters:  
-`force (Bool)`: If True, overwrite .cloupe file of the same name, if it exists. Default = `False`  
+`overwrite (Bool)`: If True, overwrite .cloupe file of the same name, if it exists. Default = `False`  
 `clusters (list)`: list of categorical columns in `adata.obs` to include as 'cluster' groups in Loupe file.  Defaults to use all available catagorical columns in `adata`, if fewer than 16.
 
 
@@ -37,7 +37,7 @@ make_loupe(
     adata, 
     cloupe_path = '/path/to/write/myloupe.cloupe',
     clusters = ['Clusters_res0.3', 'Clusters_res0.5','Batch','Donor'], 
-    force = True
+    overwrite = True
     )
 ```
 
