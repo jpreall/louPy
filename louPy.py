@@ -162,6 +162,11 @@ def make_loupe(adata,
         h5file = f'tmp_{timestamp}.h5'
         h5path = os.path.join(os.getcwd(), h5file)
 
+    # Initialize a dictionary for logging purposes
+    global _log 
+    _log = {'n_cells': adata.shape[0], 
+            'n_features': adata.shape[1]}
+
     create_hdf5(adata, 
                 h5path, 
                 clusters=clusters)
@@ -172,8 +177,18 @@ def make_loupe(adata,
 
     if os.path.exists(cloupe_path) and not overwrite:
         raise FileExistsError(f"Loupe file {cloupe_path} already exists. Use overwrite=True to replace it.")
-    run_louper(h5path, cloupe_path, overwrite=overwrite)
+    
+    #print log:
+    log_string = f"Writing Loupe file with shape: {adata.shape[0]} cells X {adata.shape[1]} features"
+    print()
+    if 'n_clusters' in _log:
+        log_string += f" and {_log['n_clusters']} annotations"
+    log_string += '...'
+    print(log_string)
 
+    run_louper(h5path, cloupe_path, overwrite=overwrite)
+    
+    # Clean up temporary HDF5 file
     os.remove(h5path)
 
 def create_hdf5(adata, 
@@ -315,6 +330,8 @@ def write_clusters(f,
     if not force:
         if len(categorical_data.columns) > max_clusterings:
             raise ValueError(f"Too many categorical columns in adata.obs. Limit is {max_clusterings}.")
+    
+    _log.update({'n_clusters': len(clusters)})
 
     # Start writing to the HDF5 file
     clusters_group = f.create_group("clusters")
@@ -349,14 +366,15 @@ def write_projections(f, adata):
     for name, projection in adata.obsm.items():
         name = name.replace('X_','')
         n_dim = projection.shape[1]
-        is_umap = bool(re.search("umap", name, re.IGNORECASE))
-        is_tsne = bool(re.search("tsne", name, re.IGNORECASE))
-        is_tsne_dash = bool(re.search("t-sne", name, re.IGNORECASE))
-
+        
         """
         # Deprecated this.  I want to be able to add in any 2D dimensinoality reduction
         # so I just use the name as the "method" variable
         # This allows for projections named "umap" and "umap_harmony", for example
+        
+        is_umap = bool(re.search("umap", name, re.IGNORECASE))
+        is_tsne = bool(re.search("tsne", name, re.IGNORECASE))
+        is_tsne_dash = bool(re.search("t-sne", name, re.IGNORECASE))
         
         if is_umap:
             method = "UMAP"
@@ -381,10 +399,10 @@ def create_metadata():
     
     # Create metadata dictionary
     meta = {}
-    meta["tool"] = "loupePy"
-    #meta["tool_version"] = pkg_resources.get_distribution("loupePy").version if pkg_resources.get_distribution("loupePy") else "n/a"
+    meta["tool"] = "louPy"
+    
     try:
-        meta["tool_version"] = pkg_resources.get_distribution("loupePy").version
+        meta["tool_version"] = pkg_resources.get_distribution("louPy").version
     except pkg_resources.DistributionNotFound:
         meta["tool_version"] = "unknown"
     meta["os"] = platform.system()
