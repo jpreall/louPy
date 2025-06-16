@@ -2,7 +2,7 @@
 Loupe File Generator for Scanpy
 
 ### Overview
-This Python script converts a Scanpy AnnData object into a Loupe-compatible HDF5 file and then runs the LoupeR executable to generate a .cloupe file. For best results, store your original integer UMI counts in the layer `adata.layers['counts']`. 
+This Python script converts a Scanpy AnnData object into a Loupe-compatible HDF5 file and then runs the LoupeR executable to generate a .cloupe file. For best results, store your original integer UMI counts in the layer `adata.layers['counts']`, since the conventional. 
 
 ### Requirements
 Python 3.x   

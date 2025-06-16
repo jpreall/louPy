@@ -68,11 +68,20 @@ def default_executable_path():
         raise RuntimeError(f"Error determining the default executable path: {e}")
 
 def bundled_executable_path():
-    return os.path.join(os.path.dirname(__file__), "exec", executable_basename())
+    """
+    Path to the bundled executable, if it exists.
+    Currently, the executable is not bundled with the package.
+    """
+    return os.path.join(os.path.dirname(__file__), "bin", executable_basename())
 
 def get_artifact():
-    sys = platform.system().lower()
-    key = "windows" if "win" in sys else "mac" if "darwin" in sys else "linux"
+    system = platform.system().lower()
+    if system == "darwin":
+        key = "mac"
+    elif system in ("windows", "cygwin", "msys"):
+        key = "windows"
+    else:
+        key = "linux"
     return _artifacts[key]
 
 def verify_executable(path):
@@ -107,7 +116,7 @@ def install_executable(force=False):
     return ok
 
 # EULA acceptance marker
-_eula_file = os.path.join(user_data_dir("loupePy", "10XGenomics"), "eula_accepted")
+_eula_file = os.path.join(os.path.dirname(__file__), "eula_accepted")
 
 def eula_have_agreed():
     return os.path.isfile(_eula_file)
@@ -119,7 +128,9 @@ def agree_eula():
         "Type 'yes' to accept: "
     )
     if input(prompt).strip().lower() == "yes":
-        Path(_eula_file).write_text(datetime.utcnow().isoformat())
+        #Path(_eula_file).write_text(datetime.utcnow().isoformat())
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        Path(_eula_file).write_text(f'EULA agreed on: {timestamp}')
         return True
     return False
 
@@ -135,15 +146,18 @@ def needs_setup(executable_path=None):
     has_exec = (executable_path or find_executable()) is not None
     has_eula = eula_have_agreed()
     if not (has_exec and has_eula):
+        print('has_exec',has_exec)
+        print('has_eula',has_eula)
         raise RuntimeError("Call setup() to install LoupeR/LouPy and agree to the EULA")
     return True
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-louper_path = os.path.join(script_dir, "louper")
+#script_dir = os.path.dirname(os.path.abspath(__file__))
+#louper_path = os.path.join(script_dir, "louper")
 
 ######## LouPy functions ########
 def make_loupe(adata, 
                cloupe_path,
+               layer='counts',
                clusters = None, 
                overwrite=False, 
                h5path=None,
@@ -175,7 +189,8 @@ def make_loupe(adata,
             'n_features': adata.shape[1]}
 
     create_hdf5(adata, 
-                h5path, 
+                h5path,
+                layer=layer, 
                 clusters=clusters)
 
     if cloupe_path is None:
@@ -199,7 +214,8 @@ def make_loupe(adata,
     os.remove(h5path)
 
 def create_hdf5(adata, 
-                h5path, 
+                h5path,
+                layer='counts', 
                 clusters=None):
     """
     Purpose: Generates an HDF5 file to be read by LoupeR binary.
@@ -214,7 +230,7 @@ def create_hdf5(adata,
         raise ValueError(f"Cannot create h5 file {h5path}, file already exists.")
     
     with h5py.File(h5path, 'w') as f:
-        write_mat(f, adata)
+        write_mat(f, adata, layer=layer)
         write_clusters(f, adata, clusters=clusters)
         write_projections(f, adata)
         metadata = create_metadata()
@@ -232,8 +248,11 @@ def run_louper(h5_path, cloupe_path, overwrite=False):
         cloupe_path: Path where the output Loupe file should be saved.
         force (optional): If True, overwrites an existing Loupe file.
     """
-
-    cmd = [louper_path, "create", "--input={}".format(h5_path), "--output={}".format(cloupe_path)]
+    louper_path = find_executable()
+    cmd = [louper_path, 
+           "create", 
+           "--input={}".format(h5_path), 
+           "--output={}".format(cloupe_path)]
     if overwrite:
         cmd.append("--force")
     try:
@@ -269,14 +288,21 @@ def write_mat(f, adata, layer='counts'):
         sanitized = np.array(sanitized, dtype=str).astype('S')
         return sanitized
 
-    if layer not in adata.layers:
-        raise ValueError(f"{layer} layer not found in adata.layers")
-    count_mat = adata.layers[layer]
+    # Prepare data matrix
+    if layer == 'X':
+        count_mat = adata.X
+    elif layer == 'raw':
+        if adata.raw is None:
+            raise ValueError("adata.raw is None, cannot use layer='raw'")
+        count_mat = adata.raw.X
+    else:
+        if layer not in adata.layers:
+            raise ValueError(f"{layer} layer not found in adata.layers")
+        count_mat = adata.layers[layer]
+    if not issparse(count_mat):
+        raise TypeError(f"The provided layer ({layer}) is not a sparse matrix")
     if not hasattr(count_mat, 'shape') or not hasattr(count_mat, '__getitem__'):
         raise TypeError(f"The provided layer ({layer}) is not a valid array-like object")
-    if not isIntegers(count_mat):
-        raise ValueError(f"The provided layer ({layer}) must contain only integer values")
-
     if not isIntegers(count_mat):
         raise ValueError(f"The provided layer ({layer}) must contain only integer values")
     
