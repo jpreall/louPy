@@ -1,5 +1,4 @@
 import os
-import re
 import numpy as np
 import h5py
 import platform
