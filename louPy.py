@@ -1,5 +1,7 @@
 import os
+import re
 import numpy as np
+import pandas as pd
 import h5py
 import platform
 import pkg_resources
@@ -312,14 +314,52 @@ def write_mat(f, adata, layer='counts'):
     ### Features group
     matrix_group = f.create_group("matrix")
 
+    # Use adata.var_names as features
     features = adata.var_names.to_numpy(dtype=str).astype('S')
     feature_count = len(features)
-    feature_ids = [f"feature_{i}" for i in range(1, len(features) + 1)]
+
+    # Define feature IDs
+    ensembl_pattern = re.compile(r'\bENS[A-Z]{1,5}\d{11}\b')
+    def contains_ensembl_ids(column: pd.Series) -> bool:
+        """
+        Checks if a given AnnData .var columns contains stable Ensembl IDs.
+        Allow for up to 5% of the features to be non-ensembl IDs to account for 
+        added transgenes or other non-ensembl features.
+        """
+        # Regular expression to match stable Ensembl IDs (e.g., ENSG00000123456)
+        matches = column.astype(str).str.contains(ensembl_pattern)
+        ensembl_matches = matches.sum()
+        return ensembl_matches / len(column) >= 0.95
+    
+    ensembl_cols = [name for name in adata.var.columns 
+                    if contains_ensembl_ids(adata.var[name])]
+
+    if ensembl_cols:
+        if len(ensembl_cols) > 1:
+            print(f"Warning: Multiple columns in adata.var match Ensembl ID format: {ensembl_cols}. Using the first one.")
+            ensembl_col = ensembl_cols[0]
+        else:
+            ensembl_col = ensembl_cols[0]
+        feature_ids = adata.var[ensembl_col].to_numpy(dtype=str).astype('S')
+        _log.update({'ensembl_ids': True})
+        _log.update({'ensembl_id_column': ensembl_col})
+    else:
+        # Otherwise, create generic numeric feature IDs
+        _log.update({'ensembl_ids': False})
+        _log.update({'ensembl_id_column': 'None_Generic_IDs_Created'})
+        feature_ids = [f"feature_{i}" for i in range(1, len(features) + 1)]
+    
+    # Check for feature_type column (eg. for 10X feature barcoding):
+    if 'feature_type' in adata.var.columns:
+        feature_types = adata.var['feature_type'].to_numpy(dtype=str).astype('S')
+    else:
+        feature_types = np.array(['Gene Expression'] * len(features), dtype='S')
+        
     # Write Features group
     features_group = matrix_group.create_group("features")
     create_str_dataset(features_group, "name", strs=features)
     create_str_dataset(features_group, "id", strs=feature_ids)
-    create_str_dataset(features_group, "feature_type", strs=["Gene Expression"] * len(features))
+    create_str_dataset(features_group, "feature_type", strs=feature_types)
     create_str_dataset(features_group, "_all_tag_keys", strs=np.array([], dtype='S'))
     
     # Write Matrix Group
